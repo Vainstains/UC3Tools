@@ -92,7 +92,7 @@ public static class Converter
                 ControlPointIndex = idx,
                 Smoothness = 1.0f,
                 HeartlinePercentage = 0.0f,
-                Relative = relative, // Use the relative parameter
+                Relative = relative,
                 DisableRolls = true
             });
         }
@@ -100,13 +100,10 @@ public static class Converter
         var bankAngles = new float[fvdData.Count];
         var relativeBanking = new bool[fvdData.Count];
         float lastAngle = 0f;
-        const float steepThresholdRadians = 80 * MathF.PI / 180f;
 
         for (int i = 0; i < fvdData.Count; i++)
         {
-            float verticalAngle = MathF.Acos(MathF.Abs(Vector3.Dot(fvdData[i].Fwd, Vector3.UnitY)));
-            
-            if (verticalAngle > steepThresholdRadians)
+            if (MathF.Abs(Vector3.Dot(fvdData[i].Fwd, Vector3.UnitY)) > 0.8)
             { // relative banking
                 Vector3 referenceUp = (i > 0) ? fvdData[i - 1].Up : Vector3.UnitY;
                 float angle = fvdData[i].CalculateRoll(referenceUp);

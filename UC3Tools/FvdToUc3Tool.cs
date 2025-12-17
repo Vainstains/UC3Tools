@@ -26,14 +26,14 @@ public sealed class FvdToUc3Tool : ITool
             Dock = DockStyle.Fill,
             Minimum = 0,
             Maximum = 100,
-            Value = 100, // Default to 1.0 (100%)
+            Value = 80,
             TickFrequency = 10,
             SmallChange = 5,
             LargeChange = 20
         };
         var lblHeartliningValue = new Label 
         { 
-            Text = "1.0",
+            Text = "0.8",
             AutoSize = true,
             TextAlign = ContentAlignment.MiddleCenter
         };
@@ -105,7 +105,7 @@ public sealed class FvdToUc3Tool : ITool
                 {
                     Path = txtCsv.Text,
                     Output = txtOut.Text,
-                    Heartlining = trkHeartlining.Value / 100f // Convert 0-100 to 0-1
+                    Heartlining = trkHeartlining.Value / 100f
                 };
 
                 Converter.ConvertFVDCsvToUC3(args);
