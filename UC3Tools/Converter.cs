@@ -6,17 +6,24 @@ namespace UC3Tools;
 
 public static class Converter
 {
-    public static void ConvertFVDCsvToUC3(string path, string output)
+    public struct FVDConverterArgs
+    {
+        public string Path;
+        public string Output;
+        public float Heartlining;
+    }
+    
+    public static void ConvertFVDCsvToUC3(FVDConverterArgs args)
     {
         var world = UC3.CreateBlankWorld();
-        var coaster = UC3.CreateCoaster(path);
-        var fvdData = FVDFrameParser.ParseFramesFromFile(path);
+        var coaster = UC3.CreateCoaster(Path.GetFileName(args.Path));
+        var fvdData = FVDFrameParser.ParseFramesFromFile(args.Path);
 
         // Adjust heartline height
         for (var i = 0; i < fvdData.Count; i++)
         {
             var frame = fvdData[i];
-            frame.Position -= frame.Up * 0.99f;
+            frame.Position -= frame.Up * args.Heartlining;
             fvdData[i] = frame;
         }
 
@@ -66,7 +73,7 @@ public static class Converter
         curve.BankNodes.Clear();
         curve.NurbsSequence.ControlPoint.Clear();
 
-        void AddNodeSuper(Vector3 position, float bankAngle, float nextBankAngle, bool isLast)
+        void AddNode(Vector3 position, float bankAngle, bool relative)
         {
             position.Y += 10;
             int idx = curve.NurbsSequence.ControlPoint.Count;
@@ -77,48 +84,61 @@ public static class Converter
                 Strict = false,
                 Weight = 1.0f
             });
-
-            if (!isLast)
+            
+            curve.BankNodes.Add(new()
             {
-                curve.BankNodes.Add(new()
-                {
-                    Angle = bankAngle,
-                    ContinuousRoll = true,
-                    ControlPointIndex = idx,
-                    Smoothness = 1.0f,
-                    HeartlinePercentage = 0.0f,
-                    Relative = false,
-                    DisableRolls = true
-                });
-            }
+                Angle = bankAngle,
+                ContinuousRoll = true,
+                ControlPointIndex = idx,
+                Smoothness = 1.0f,
+                HeartlinePercentage = 0.0f,
+                Relative = relative, // Use the relative parameter
+                DisableRolls = true
+            });
         }
 
         var bankAngles = new float[fvdData.Count];
+        var relativeBanking = new bool[fvdData.Count];
         float lastAngle = 0f;
+        const float steepThresholdRadians = 80 * MathF.PI / 180f;
 
         for (int i = 0; i < fvdData.Count; i++)
         {
-            float angle = fvdData[i].CalculateGlobalRoll();
-
-            while (angle - lastAngle > MathF.PI) angle -= MathF.PI * 2;
-            while (angle - lastAngle < -MathF.PI) angle += MathF.PI * 2;
-
-            bankAngles[i] = angle;
-            lastAngle = angle;
+            float verticalAngle = MathF.Acos(MathF.Abs(Vector3.Dot(fvdData[i].Fwd, Vector3.UnitY)));
+            
+            if (verticalAngle > steepThresholdRadians)
+            { // relative banking
+                Vector3 referenceUp = (i > 0) ? fvdData[i - 1].Up : Vector3.UnitY;
+                float angle = fvdData[i].CalculateRoll(referenceUp);
+                relativeBanking[i] = true;
+                
+                bankAngles[i] = angle;
+                lastAngle = angle;
+            }
+            else
+            { // global banking
+                float angle = fvdData[i].CalculateGlobalRoll();
+                
+                while (angle - lastAngle > MathF.PI) angle -= MathF.PI * 2;
+                while (angle - lastAngle < -MathF.PI) angle += MathF.PI * 2;
+                
+                bankAngles[i] = angle;
+                relativeBanking[i] = false;
+                lastAngle = angle;
+            }
         }
 
         for (int i = 0; i < fvdData.Count; i++)
         {
-            AddNodeSuper(
+            AddNode(
                 fvdData[i].Position,
                 bankAngles[i],
-                bankAngles[Math.Min(i + 1, fvdData.Count - 1)],
-                i == fvdData.Count - 1
+                relativeBanking[i]
             );
         }
 
         world.World.Coasters = [coaster];
-        File.WriteAllBytes(output, world.SerializeToBytes());
+        File.WriteAllBytes(args.Output, world.SerializeToBytes());
     }
 }
 
@@ -129,41 +149,32 @@ public struct FVDFrame(Vector3 position, Vector3 fwd, Vector3 left, Vector3 up)
     public Vector3 Left = left;
     public Vector3 Up = up;
     
-    public float CalculateGlobalRoll()
+    public float CalculateGlobalRoll() => CalculateRoll(Vector3.UnitY);
+    public float CalculateRoll(Vector3 refUp)
     {
-        // Normalize the forward vector (just in case)
         Vector3 fwd = Vector3.Normalize(Fwd);
-    
-        // The global up vector (world space)
-        Vector3 globalUp = Vector3.UnitY;  // Assuming Y is up in your world
-    
-        // Project the global up vector onto the plane perpendicular to forward
-        Vector3 projGlobalUp = globalUp - Vector3.Dot(globalUp, fwd) * fwd;
-    
-        // Normalize the projected vector
+        
+        Vector3 projGlobalUp = refUp - Vector3.Dot(refUp, fwd) * fwd;
+        
         if (projGlobalUp.LengthSquared < 1e-12f)
         {
-            // Edge case: forward is parallel to global up
             return 0f;
         }
         projGlobalUp = Vector3.Normalize(projGlobalUp);
-    
-        // Project the frame's up vector onto the same plane
+        
         Vector3 projFrameUp = Up - Vector3.Dot(Up, fwd) * fwd;
     
         if (projFrameUp.LengthSquared < 1e-12f)
         {
-            // Edge case: frame's up is parallel to forward
             return 0f;
         }
         projFrameUp = Vector3.Normalize(projFrameUp);
-    
-        // Calculate the angle between the two projected vectors
+        
         float dot = Vector3.Dot(projGlobalUp, projFrameUp);
-        dot = Math.Clamp(dot, -1f, 1f);  // Ensure within valid range
+        dot = Math.Clamp(dot, -1f, 1f);
         float angle = MathF.Acos(dot);
     
-        // Determine sign using cross product with forward vector
+        
         Vector3 cross = Vector3.Cross(projGlobalUp, projFrameUp);
         float sign = MathF.Sign(Vector3.Dot(cross, fwd));
     
