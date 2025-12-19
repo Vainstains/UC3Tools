@@ -8,6 +8,7 @@ public sealed class MainForm : Form
     private readonly ITool[] _tools =
     {
         new FvdToUc3Tool(),
+        new Uc2ToUc3Tool()
     };
 
     public MainForm()
@@ -21,7 +22,8 @@ public sealed class MainForm : Form
             Dock = DockStyle.Top,
             DropDownStyle = ComboBoxStyle.DropDownList
         };
-
+        
+        _toolSelector.Items.Add("-- select tool --");
         _toolSelector.Items.AddRange(_tools.Select(t => t.Name).ToArray());
         _toolSelector.SelectedIndexChanged += ToolChanged;
 
@@ -39,7 +41,11 @@ public sealed class MainForm : Form
     private void ToolChanged(object? sender, EventArgs e)
     {
         _toolHost.Controls.Clear();
-        var tool = _tools[_toolSelector.SelectedIndex];
+        
+        if (_toolSelector.SelectedIndex <= 0)
+            return;
+        
+        var tool = _tools[_toolSelector.SelectedIndex - 1];
         var ui = tool.CreateUI();
 
         ui.Dock = DockStyle.Fill;

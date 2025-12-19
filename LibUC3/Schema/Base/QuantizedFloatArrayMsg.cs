@@ -109,5 +109,14 @@ public class QuantizedFloatArrayMsg : Message, IReadOnlyList<float>
 
     public int Count => m_floats.Length;
 
-    public float this[int index] => m_floats[index];
+    public float this[int index]
+    {
+        get => m_floats[index];
+        set => m_floats[index] = value;
+    }
+
+    public void Clear(int numFloats)
+    {
+        m_floats = new float[numFloats];
+    }
 }
