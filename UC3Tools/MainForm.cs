@@ -8,14 +8,15 @@ public sealed class MainForm : Form
     private readonly ITool[] _tools =
     {
         new FvdToUc3Tool(),
-        new Uc2ToUc3Tool()
+        new Uc2ToUc3Tool(),
+        new TerrainGenTool()
     };
 
     public MainForm()
     {
         Text = "UC3 Tools";
         Width = 400;
-        Height = 250;
+        Height = 400;
 
         _toolSelector = new ComboBox
         {
