@@ -24,7 +24,7 @@ public sealed class FvdToUc3Tool : ITool
         var trkHeartlining = new TrackBar 
         { 
             Dock = DockStyle.Fill,
-            Minimum = 0,
+            Minimum = -100,
             Maximum = 100,
             Value = 80,
             TickFrequency = 10,
@@ -62,7 +62,7 @@ public sealed class FvdToUc3Tool : ITool
 
         // Add tooltip for heartlining
         var toolTip = new ToolTip();
-        toolTip.SetToolTip(trkHeartlining, "Heartlining (0=no heartlining, 1=one meter heartlining)");
+        toolTip.SetToolTip(trkHeartlining, "Heartlining (meters)");
         toolTip.SetToolTip(lblHeartliningValue, "Heartlining");
 
         layout.Controls.Add(btnConvert, 2, 3);
